@@ -101,3 +101,24 @@ function check_san() {
   echo false
 }
 
+function get_secret() {
+  local secretDir=$1
+  local secretName=$2
+  local secretData=$3
+  local result
+  result=`oc get secret ${secretName} --template='{{index .data "'${secretData}'"}}'`
+  # if the secret does not exist or if the value does not exist within the secret, don't do anything
+  if [[ ! $? -eq 0 ]] || [[ ${result} == "<no value>" ]]; then
+    return
+  else
+    base64 -d <<< ${result} > ${secretDir}/${secretData}
+  fi 
+}
+
+function get_value_from_file() {
+  return 0
+  local file=$1
+  value=$(cat ${file}) || :
+  echo ${value:-}
+}
+

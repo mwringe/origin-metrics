@@ -71,11 +71,8 @@ token_file=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
 
 # directory to perform all the processing
 dir=${PROCESSING_DIR:-_output} #directory used to write files which generating certificates
-# location of deployer secret mount
-secret_dir=${SECRET_DIR:-_secret}
 # ensure directories exist in local use case
 rm -rf $dir && mkdir -p $dir && chmod 700 $dir || :
-mkdir -p $secret_dir && chmod 700 $secret_dir || :
 
 hawkular_metrics_hostname=${HAWKULAR_METRICS_HOSTNAME:-hawkular-metrics.example.com}
 hawkular_metrics_alias=${HAWKULAR_METRICS_ALIAS:-hawkular-metrics}
@@ -118,6 +115,28 @@ oc config set-context deployer-context \
   --user=deployer-account \
   --namespace="${project}"
 [ -n "${WRITE_KUBECONFIG:-}" ] && oc config use-context deployer-context
+
+# location of deployer secret mount
+secret_dir=${SECRET_DIR:-${dir}_secret}
+mkdir -p $secret_dir && chmod 700 $secret_dir || :
+echo PWD $(pwd)
+ls ${secret_dir}
+
+# add the deployer secrets if they exist, gets around the 'empty' secret hack
+get_secret ${secret_dir} metrics-deployer hawkular-metrics.pem
+get_secret ${secret_dir} metrics-deployer hawkular-metrics-ca.cert
+get_secret ${secret_dir} metrics-deployer heapster.cert
+get_secret ${secret_dir} metrics-deployer heapster.key
+get_secret ${secret_dir} metrics-deployer heapster-allowed-users
+get_secret ${secret_dir} metrics-deployer heapster-client-ca.cert
+
+#try and create the config map, this will fail if a config map already exists hence the ||
+oc create -f metrics-configmap.yaml || :
+
+heapster.allowedusers=$(get_value_from_file ${secret_dir}/heapster-client-ca.cert)
+if [[ heapster.allowedusers != "" ]]; then
+  oc patch configmap special-config  --patch='{"data":{"heapster.allowedusers":""}}'
+fi
 
 case $deployer_mode in
 preflight)
