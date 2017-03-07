@@ -24,11 +24,11 @@ parameters:
   required: true
 - description: Path within the container to the file containing the Certificate Authorities to add to the peer trust store
   name: TRUSTSTORE_NODES_AUTHORITIES
-  value: '/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt'
+  value: '/hawkular-cassandra-certs/tls.peer.truststore.crt'
   required: false
 - description: Path within the container to the file containing the Certificate Authorities to add to the client trust store
   name: TRUSTSTORE_CLIENT_AUTHORITIES
-  value: '/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt'
+  value: '/hawkular-cassandra-certs/tls.client.truststore.crt'
   required: false
 objects:
 - apiVersion: v1

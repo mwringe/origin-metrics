@@ -28,9 +28,6 @@ function deploy_hawkular() {
   cassandra_tls_peer_truststore=$(base64 -w 0 ${dir}/hawkular-cassandra.crt)
   cassandra_tls_client_truststore=$(base64 -w 0 ${dir}/hawkular-metrics.crt)
 
-  TRUSTSTORE_NODES_AUTHORITIES=/hawkular-cassandra-certs/tls.peer.truststore.crt
-  TRUSTSTORE_CLIENT_AUTHORITIES=/hawkular-cassandra-certs/tls.client.truststore.crt
-
   cat > ${dir}/hawkular-cassandra-certs.yaml <<EOF
 apiVersion: v1
 data:
@@ -190,9 +187,7 @@ EOF
         -v IMAGE_VERSION=$image_version \
         -v NODE=1 \
         -v PV_SIZE=$cassandra_pv_size \
-        -v MASTER=true \
-        -v TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES} \
-        -v TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES} | oc create -f - || true
+        -v MASTER=true | oc create -f - || true
       # Deploy any subsequent Cassandra nodes
       for i in $(seq 2 $cassandra_nodes);
       do
@@ -200,9 +195,7 @@ EOF
         oc process hawkular-cassandra-node-dynamic-pv \
           -v IMAGE_PREFIX=$image_prefix \
           -v IMAGE_VERSION=$image_version \
-          -v PV_SIZE=$cassandra_pv_size -v NODE=$i \
-          -v TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES} \
-          -v TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES} | oc create -f - || true
+          -v PV_SIZE=$cassandra_pv_size -v NODE=$i | oc create -f - || true
       done
     else
       echo "Setting up Cassandra with Persistent Storage"
@@ -213,9 +206,7 @@ EOF
         -v IMAGE_VERSION=$image_version \
         -v NODE=1 \
         -v PV_SIZE=$cassandra_pv_size \
-        -v MASTER=true \
-        -v TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES} \
-        -v TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES} | oc create -f - || true
+        -v MASTER=true | oc create -f - || true
       # Deploy any subsequent Cassandra nodes
       for i in $(seq 2 $cassandra_nodes);
       do
@@ -224,9 +215,7 @@ EOF
           -v IMAGE_PREFIX=$image_prefix \
           -v IMAGE_VERSION=$image_version \
           -v PV_SIZE=$cassandra_pv_size \
-          -v NODE=$i \
-          -v TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES} \
-          -v TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES} | oc create -f - || true
+          -v NODE=$i | oc create -f - || true
       done
     fi
   else
@@ -235,17 +224,13 @@ EOF
       -v IMAGE_PREFIX=$image_prefix \
       -v IMAGE_VERSION=$image_version \
       -v NODE=1 \
-      -v MASTER=true \
-      -v TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES} \
-      -v TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES} | oc create -f -
+      -v MASTER=true | oc create -f -
     for i in $(seq 2 $cassandra_nodes);
     do
       oc process hawkular-cassandra-node-emptydir \
         -v IMAGE_PREFIX=$image_prefix \
         -v IMAGE_VERSION=$image_version \
-        -v NODE=$i \
-        -v TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES} \
-        -v TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES} | oc create -f -
+        -v NODE=$i | oc create -f -
     done
   fi
 }

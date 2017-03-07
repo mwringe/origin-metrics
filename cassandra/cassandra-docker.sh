@@ -79,6 +79,12 @@ do
     --truststore_client_authorities=*)
       TRUSTSTORE_CLIENT_AUTHORITIES="${args#*=}"
     ;;
+    --tls_certificate=*)
+      SERVICE_CERT="${args#*=}"
+    ;;
+    --tls_certificate_key=*)
+      SERVICE_CERT_KEY="${args#*=}"
+    ;;
     --help)
       HELP=true
     ;;
@@ -156,6 +162,12 @@ if [ -n "$HELP" ]; then
   echo
   echo "  --truststore_client_authorities=TRUSTSTORE_CLIENT_AUTHORITIES"
   echo "        a file containing all certificate authorities to trust as clients"
+  echo
+  echo "  --tls_certificate=SERVICE_CERT"
+  echo "        the path to the certificate file to be used as the service certificate"
+  echo
+  echo "  --tls_certificate_key=SERVICE_CERT_KEY"
+  echo "        the path to the certificate private key part to the SERVICE_CERT"
   echo
   exit 0
 fi
