@@ -127,9 +127,16 @@ SERVICE_ALIAS=${SERVICE_ALIAS:-"cassandra"}
 SERVICE_CERT=${SERVICE_CERT:-"/hawkular-cassandra-certs/tls.crt"}
 SERVICE_CERT_KEY=${SERVICE_CERT_KEY:-"/hawkular-cassandra-certs/tls.key"}
 
-TRUSTSTORE_NODES_AUTHORITIES=${TRUSTSTORE_NODES_AUTHORITIES:-"/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"}
-TRUSTSTORE_CLIENT_AUTHORITIES=${TRUSTSTORE_CLIENT_AUTHORITIES:-"/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"}
-SERVICE_CA_ALIAS=${SERVICE_CA_ALIAS:-"services-ca"}
+if [ -z "${TRUSTSTORE_NODES_AUTHORITIES}" ]; then
+ echo "The --truststore_node_authorities value is not specified. Aborting"
+ exit 1
+fi
+
+if [ -z "${TRUSTSTORE_CLIENT_AUTHORITIES}" ]; then
+ echo "The --truststore_client_authorities value is not specified. Aborting"
+ exit 1
+fi
+
 
 PKCS12_FILE=${PKCS12_FILE:-"${KEYSTORE_DIR}/cassandra.pkcs12"}
 KEYTOOL_COMMAND="/usr/lib/jvm/java-1.8.0/jre/bin/keytool"
@@ -273,8 +280,8 @@ sed -i 's#${KEYSTORE_FILE}#'$KEYSTORE_FILE'#g' /opt/apache-cassandra/conf/cassan
 TRUSTSTORE_NODES_FILE=${TRUSTSTORE_NODES_FILE:-"${KEYSTORE_DIR}/.nodes.truststore"}
 TRUSTSTORE_NODES_PASSWORD=${TRUSTSTORE_NODES_PASSWORD:-$(openssl rand -base64 512 | tr -dc A-Z-a-z-0-9 | head -c 17)}
 
-# the next few lines deserve an explanation: the service-ca.crt provided by OpenShift contains the root CA and the
-# service-ca certificates in a single file. Java's keytool can't handle this, it seems, and ends up importing only
+# The next few lines deserve an explantion: the TRUSTSTORE_NODES_AUTHORITIES may contain the root CA and the certificates
+# in a single file. Java's keytool can't handle this, it seems, and ends up importing only
 # the first one. So, we split the file, having one cert per resulting file. The next lines are for that, and
 # will only work properly on the scenario described. If the scenario ever changes, the next lines will probably
 # need to be adapted accordingly. The best solution would be to have one cert per file.
@@ -282,7 +289,7 @@ PREV_DIR=${PWD}
 cd ${KEYSTORE_DIR}
 csplit -z -f cas-to-import ${TRUSTSTORE_NODES_AUTHORITIES} '/-----BEGIN CERTIFICATE-----/' '{*}' > /dev/null
 if [ $? != 0 ]; then
-    echo "Failed to split the original service-ca into individual cert files. Aborting."
+    echo "Failed to split the trustore_nodes_authorities into individual cert files. Aborting."
     exit 1
 fi
 
@@ -310,7 +317,7 @@ PREV_DIR=${PWD}
 cd ${KEYSTORE_DIR}
 csplit -z -f cas-to-import ${TRUSTSTORE_CLIENT_AUTHORITIES} '/-----BEGIN CERTIFICATE-----/' '{*}' > /dev/null
 if [ $? != 0 ]; then
-    echo "Failed to split the original service-ca into individual cert files. Aborting."
+    echo "Failed to split the truststore_client_authorities into individual cert files. Aborting."
     exit 1
 fi
 
@@ -325,6 +332,11 @@ do
 done
 
 rm cas-to-import*
+
+echo "Generating self signed certificates for the local client for cqlsh"
+openssl req -new -newkey rsa:4096 -x509 -keyout .cassandra.local.client.key -out .cassandra.local.client.cert -subj "/CN=local.cassandra" -nodes -days 1825
+${KEYTOOL_COMMAND} -noprompt -import -alias .cassandra.local.client.cert -file .cassandra.local.client.cert -keystore ${TRUSTSTORE_CLIENT_FILE} -trustcacerts -storepass ${TRUSTSTORE_CLIENT_PASSWORD}
+
 cd ${PREV_DIR}
 sed -i 's#${TRUSTSTORE_CLIENT_FILE}#'$TRUSTSTORE_CLIENT_FILE'#g' /opt/apache-cassandra/conf/cassandra.yaml
 sed -i 's#${TRUSTSTORE_CLIENT_PASSWORD}#'$TRUSTSTORE_CLIENT_PASSWORD'#g' /opt/apache-cassandra/conf/cassandra.yaml
@@ -335,9 +347,11 @@ cat >> $HOME/.cassandra/cqlshrc << DONE
 [connection]
 hostname= $HOSTNAME
 port = 9042
-
+factory = cqlshlib.ssl.ssl_transport_factory
 [ssl]
 certfile = ${SERVICE_CERT}
+userkey = ${KEYSTORE_DIR}/.cassandra.local.client.key
+usercert = ${KEYSTORE_DIR}/.cassandra.local.client.cert
 DONE
 
 # verify that we are not trying to run an older version of Cassandra which has been configured for a newer version.
